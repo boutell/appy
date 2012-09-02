@@ -4,6 +4,7 @@ var passport = require('passport');
 var fs = require('fs');
 var async = require('async');
 var mongo = require('mongodb');
+var connectMongoDb = require('connect-mongodb');
 
 var options;
 var db;
@@ -87,8 +88,12 @@ function appBootstrap(callback) {
   app.use(canonicalizeHost);
   app.use(express.bodyParser());
   app.use(express.cookieParser());
+
   // Express sessions let us remember the mood the user wanted while they are off logging in on twitter.com
-  app.use(express.session({ secret: options.sessionSecret }));
+  // The mongo session store allows our sessions to persist between restarts of the app
+  var mongoStore = new connectMongoDb({ db: db });
+
+  app.use(express.session({ secret: options.sessionSecret, store: mongoStore }));
   // We must install passport's middleware before we can set routes that depend on it
   app.use(passport.initialize());
   // Passport sessions remember that the user is logged in
