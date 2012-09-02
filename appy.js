@@ -5,11 +5,14 @@ var fs = require('fs');
 var process = require('process');
 var async = require('async');
 
+var options;
 var db;
 var app;
 
-module.exports.bootstrap = function(options)
+module.exports.bootstrap = function(optionsArg)
 {
+  options = optionsArg;
+
   if (!options.callbacks)
   {
     options.callbacks = {};
