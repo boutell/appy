@@ -13,25 +13,9 @@ module.exports.bootstrap = function(optionsArg)
 {
   options = optionsArg;
 
-  if (!options.callbacks)
-  {
-    options.callbacks = {};
-  }
-
-  if (!options.callbacks.ready)
-  {
-    options.callbacks.ready = function(err)
-    {
-      if (err)
-      {
-        console.log(err);
-        process.exit(1);
-      }
-      // We're ready to go, just keep processing requests
-    }
-  }
-
-  async.series([dbBootstrap, appBootstrap, listenBootstrap], options.callbacks.ready);
+  async.series([dbBootstrap, appBootstrap, listenBootstrap], function(err) {
+    options.ready(err, app, db);
+  });
 }
 
 function dbBootstrap(callback) {
@@ -47,21 +31,7 @@ function dbBootstrap(callback) {
       callback(err);
       return;
     }
-    // For setting up collection indexes etc.
-    if (options.callbacks.db)
-    {
-      options.callbacks.db(function(err) {
-        if (err) {
-          callback(err);
-          return;
-        }
-        callback(null);
-      });
-    }
-    else
-    {
-      callback(null);
-    }
+    callback(null);
   });
 }
 
@@ -152,15 +122,8 @@ function appBoostrap(callback) {
   }
 }
 
-function listenBootstrap(callback)
+module.exports.listen()
 {
-  if (options.callbacks.beforeListen)
-  {
-    options.callbacks.beforeListen(function(err))
-    {
-      callback(err);
-    }
-  }
   var port = 3000;
   try {
     // In production get the port number from stagecoach
