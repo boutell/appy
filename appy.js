@@ -2,8 +2,8 @@ var express = require('express');
 var _ = require('underscore');
 var passport = require('passport');
 var fs = require('fs');
-var process = require('process');
 var async = require('async');
+var mongo = require('mongodb');
 
 var options;
 var db;
@@ -13,16 +13,22 @@ module.exports.bootstrap = function(optionsArg)
 {
   options = optionsArg;
 
-  async.series([dbBootstrap, appBootstrap, listenBootstrap], function(err) {
+  async.series([dbBootstrap, appBootstrap], function(err) {
     options.ready(err, app, db);
   });
 }
 
 function dbBootstrap(callback) {
+  if (!options.db.host) {
+    options.db.host = 'localhost';
+  }
+  if (!options.db.port) {
+    options.db.port = 27017;
+  }
   // Open the database connection
   db = module.exports.db = new mongo.Db(
-    settings.db.name,
-    new mongo.Server(settings.db.host, settings.db.port, {}),
+    options.db.name,
+    new mongo.Server(options.db.host, options.db.port, {}),
     {});
 
   db.open(function(err) {
@@ -35,7 +41,7 @@ function dbBootstrap(callback) {
   });
 }
 
-function appBoostrap(callback) {
+function appBootstrap(callback) {
   app = module.exports.app = express();
   var TwitterStrategy = require('passport-twitter').Strategy;
   passport.use(new TwitterStrategy(
@@ -113,7 +119,7 @@ function appBoostrap(callback) {
   {
     if (req.headers.host !== options.host)
     {
-      res.redirect('http://' + options.host + req.url, 301);
+      res.redirect(301, 'http://' + options.host + req.url);
     }
     else
     {
@@ -122,8 +128,7 @@ function appBoostrap(callback) {
   }
 }
 
-module.exports.listen()
-{
+module.exports.listen = function() {
   var port = 3000;
   try {
     // In production get the port number from stagecoach
