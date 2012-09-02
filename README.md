@@ -31,7 +31,8 @@ Here's a minimal example:
       sessionSecret: 'whatever',
       host: 'my.example.com:3000',
       db: {
-        url: 'mongodb://localhost/example',
+        // host: 'localhost',
+        // port: 27017,
         name: 'example'
       },
       ready: function(app, db) {
