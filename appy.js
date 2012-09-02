@@ -5,10 +5,93 @@ var fs = require('fs');
 var async = require('async');
 var mongo = require('mongodb');
 var connectMongoDb = require('connect-mongodb');
+var flash = require('connect-flash');
 
 var options;
 var db;
 var app;
+var insecure = { login: true, logout: true };
+
+var authStrategies = {
+  twitter: function(options)
+  {
+    var TwitterStrategy = require('passport-twitter').Strategy;
+    passport.use(new TwitterStrategy(
+      options,
+      function(token, tokenSecret, profile, done) {
+        // We now have a unique id, username and full name
+        // (display name) for the user courtesy of Twitter.
+        var user = {
+          'id': profile.id,
+          'username': profile.username,
+          'displayName': profile.displayName
+        };
+        done(null, user);
+      }
+    ));
+
+    // Redirect the user to Twitter for authentication.  When complete, Twitter
+    // will redirect the user back to the application at
+    // /auth/twitter/callback
+    app.get('/login', passport.authenticate('twitter'));
+
+    // Twitter will redirect the user to this URL after approval.  Finish the
+    // authentication process by attempting to obtain an access token.  If
+    // access was granted, the user will be logged in.  Otherwise,
+    // authentication has failed.
+    app.get('/twitter-auth',
+      passport.authenticate('twitter', { successRedirect: '/',
+                                         failureRedirect: '/' }));
+  },
+  local: function(options)
+  {
+    var LocalStrategy = require('passport-local').Strategy;
+    passport.use(new LocalStrategy(
+      function(username, password, done) {
+        var user = _.find(options.users, function(user) {
+          return ((user.username === username) && (user.password === password));
+        });
+        if (!user) {
+          return done(null, false, { message: 'Invalid username or password' });
+        }
+        return done(null, user);
+      }
+    ));
+    app.get('/login', function(req, res) {
+      var message = req.flash('error');
+      if (!options.template) {
+        options.template =
+          '<% if (message) { %>' +
+          '<h3><%= message %></h3>' +
+          '<% } %>' +
+          '<form action="/login" method="post">' +
+            '<div>' +
+            '<label>Username:</label>' +
+            '<input type="text" name="username" /><br/>' +
+            '</div>' +
+            '<div>' +
+            '<label>Password:</label>' +
+            '<input type="password" name="password"/>' +
+            '</div>' +
+            '<div>' +
+            '<input type="submit" value="Submit"/>' +
+            '</div>' +
+          '</form>';
+      }
+      if (typeof(options.template) !== 'function') {
+        options.template = _.template(options.template);
+      }
+      res.send(options.template({ message: message }));
+    });
+    app.post('/login',
+      passport.authenticate('local',
+        { failureRedirect: '/login', failureFlash: true }),
+      function(req, res) {
+        res.redirect('/');
+      }
+    );
+  }
+};
 
 module.exports.bootstrap = function(optionsArg)
 {
@@ -48,26 +131,10 @@ function dbBootstrap(callback) {
 
 function appBootstrap(callback) {
   app = module.exports.app = express();
-  var TwitterStrategy = require('passport-twitter').Strategy;
-  passport.use(new TwitterStrategy(
-    options.twitter,
-    function(token, tokenSecret, profile, done) {
-      // We now have a unique id, username and full name
-      // (display name) for the user courtesy of Twitter.
-      var user = {
-        'id': profile.id,
-        'username': profile.username,
-        'displayName': profile.displayName
-      };
-      done(null, user);
-    }
-  ));
 
-  // It's up to us to tell Passport how to store the current user in the session, and how to take
-  // session data and get back a user object. We could store just an id in the session and go back
-  // and forth to the complete user object via MySQL or MongoDB lookups, but since the user object
-  // is small and changes rarely, we'll save a round trip to the database by storing the user
-  // information directly in the session in JSON string format.
+  // Serialize users directly in the session. So far this
+  // works for the passport strategies I've used and
+  // avoids database hits
 
   passport.serializeUser(function(user, done) {
     done(null, JSON.stringify(user));
@@ -98,21 +165,43 @@ function appBootstrap(callback) {
   app.use(passport.initialize());
   // Passport sessions remember that the user is logged in
   app.use(passport.session());
+  app.use(flash());
 
-  // Borrowed from http://passportjs.org/guide/twitter.html
+  // Before we set up any routes we need to set up our security middleware
 
-  // Redirect the user to Twitter for authentication.  When complete, Twitter
-  // will redirect the user back to the application at
-  // /auth/twitter/callback
-  app.get('/login', passport.authenticate('twitter'));
+  if (!options.unlocked)
+  {
+    options.unlocked = [];
+  }
+  _.each(['/login', '/logout', '/twitter-auth'], function(url) {
+    if (!_.include(options.unlocked, url))
+    {
+      options.unlocked.push(url);
+    }
+  });
 
-  // Twitter will redirect the user to this URL after approval.  Finish the
-  // authentication process by attempting to obtain an access token.  If
-  // access was granted, the user will be logged in.  Otherwise,
-  // authentication has failed.
-  app.get('/twitter-auth',
-    passport.authenticate('twitter', { successRedirect: '/',
-                                       failureRedirect: '/' }));
+  if (options.locked === true) {
+    // Secure everything except prefixes on the unlocked list
+    // (the middleware checks for those)
+    app.use(securityMiddleware);
+  } else if (options.locked) {
+    // Secure only things matching the given prefixes, minus things
+    // matching the insecure list
+    if (typeof(options.locked) === 'string')
+    {
+      options.locked = [options.locked];
+    }
+    _.each(options.locked, function(prefix) {
+      app.use(prefix, securityMiddleware);
+    });
+  } else {
+    // No security by default (but logins work and you can check req.user yourself)
+  }
+
+  if (options.auth)
+  {
+    authStrategies[options.auth.strategy](options.auth.options);
+  }
 
   app.get('/logout', function(req, res)
   {
@@ -149,3 +238,43 @@ module.exports.listen = function() {
   console.log("Listening on port " + port);
   app.listen(port);
 }
+
+
+function securityMiddleware(req, res, next) {
+  var i;
+  for (i = 0; (i < options.unlocked.length); i++)
+  {
+    if (prefixMatch(options.unlocked[i], req.url))
+    {
+      next();
+      return;
+    }
+  }
+
+  if (!req.user) {
+    req.session.afterLogin = req.url;
+    res.redirect(302, '/login');
+    return;
+  }
+  else
+  {
+    next();
+  }
+}
+
+// Match URL prefixes the same way Connect middleware does
+function prefixMatch(prefix, url)
+{
+  var start = url.substr(0, prefix.length);
+  if (prefix === start)
+  {
+    var c = url[prefix.length];
+    if (c && ('/' != c) && ('.' != c))
+    {
+      return false;
+    }
+    return true;
+  }
+  return false;
+}
+

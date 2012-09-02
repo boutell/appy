@@ -16,7 +16,9 @@
     "passport-twitter": "~0.1.4",
     "mongodb": "~1.1.6",
     "async": "~0.1.22",
-    "connect-mongodb": "~1.1.5"
+    "connect-mongodb": "~1.1.5",
+    "passport-local": "~0.1.6",
+    "connect-flash": "~0.1.0"
   },
   "devDependencies": {},
   "optionalDependencies": {},
