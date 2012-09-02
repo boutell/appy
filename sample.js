@@ -12,12 +12,7 @@ appy.bootstrap({
     url: 'mongodb://localhost/example',
     name: 'example'
   },
-  ready: function(err, app, db) {
-    if (err)
-    {
-      console.log(err);
-      process.exit(1);
-    }
+  ready: function(app, db) {
     var poster = db.collection('post');
     app.get('/', function(req, res) {
       poster.find().sort({created: -1}).toArray(function(err, posts) {

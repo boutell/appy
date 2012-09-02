@@ -14,7 +14,11 @@ module.exports.bootstrap = function(optionsArg)
   options = optionsArg;
 
   async.series([dbBootstrap, appBootstrap], function(err) {
-    options.ready(err, app, db);
+    if (err) {
+      console.log(err);
+      process.exit(1);
+    }
+    options.ready(app, db);
   });
 }
 
