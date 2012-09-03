@@ -269,7 +269,7 @@ function prefixMatch(prefix, url)
   if (prefix === start)
   {
     var c = url[prefix.length];
-    if (c && ('/' != c) && ('.' != c))
+    if (c && ('/' != c) && ('.' != c) && ('?' != c))
     {
       return false;
     }
