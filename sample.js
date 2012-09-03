@@ -18,16 +18,21 @@ appy.bootstrap({
   // More useful in practice
   // auth: {
   //   strategy: 'twitter',
-  //   consumerKey: 'xxxx',
-  //   consumerSecret: 'xxxx',
-  //   callbackURL: 'http://my.example.com:3000/twitter-auth'
+  //   options: {
+  //     consumerKey: 'xxxx',
+  //     consumerSecret: 'xxxx',
+  //     callbackURL: 'http://my.example.com:3000/twitter-auth'
+  //   }
   // },
 
-  // Lock the /new prefix. You can lock
+  // Lock the /new prefix to require login. You can lock
   // an array of prefixes if you wish.
   // Prefixes must be followed by / or . or
-  // be matched exactly
+  // be matched exactly. To lock everything except the
+  // login mechanism itself, use locked: true
   locked: '/new',
+  // If you're using locked: true you can make exceptions here
+  // unlocked: [ '/welcome' ]
   sessionSecret: 'whatever',
   host: 'my.example.com:3000',
   db: {

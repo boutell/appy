@@ -1,8 +1,8 @@
 {
   "author": "Thomas Boutell <boutell@boutell.com> (http://justjs.com/)",
   "name": "appy",
-  "description": "Bootstrap a typical Express 3.0 app with even less fuss than usual. Makes a bunch of bold assumptions that are spot on for me and allow me to get moving swiftly",
-  "version": "0.1.2",
+  "description": "Bootstrap a typical Express 3.0 app with even less fuss than usual. Makes a bunch of bold assumptions that are spot on for my apps and allow me to get moving swiftly",
+  "version": "0.1.3",
   "homepage": "https://github.com/boutell/appy",
   "repository": {
     "type": "git",
