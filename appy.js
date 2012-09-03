@@ -153,6 +153,12 @@ function appBootstrap(callback) {
   });
 
   app.use(canonicalizeHost);
+
+  if (options.static)
+  {
+    app.use(express.static(options.static));
+  }
+
   app.use(express.bodyParser());
   app.use(express.cookieParser());
 
