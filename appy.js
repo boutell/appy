@@ -233,7 +233,7 @@ function appBootstrap(callback) {
 }
 
 module.exports.listen = function() {
-  var port = 3000;
+  var port = options.port ? options.port : 3000;
   try {
     // In production get the port number from stagecoach
     port = fs.readFileSync(__dirname + '/data/port', 'UTF-8').replace(/\s+$/, '');
