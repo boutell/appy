@@ -117,7 +117,9 @@ function dbBootstrap(callback) {
   db = module.exports.db = new mongo.Db(
     options.db.name,
     new mongo.Server(options.db.host, options.db.port, {}),
-    {});
+    // Sensible default of safe: true
+    // (soon to be the driver's default)
+    { safe: true });
 
   db.open(function(err) {
     if (err)
@@ -125,7 +127,31 @@ function dbBootstrap(callback) {
       callback(err);
       return;
     }
-    callback(null);
+    if (options.db.collections) {
+      async.map(options.db.collections, function(info, next) {
+        var name;
+        if (typeof(info) !== 'string') {
+          name = info.name;
+        }
+        else
+        {
+          name = info;
+        }
+        db.collection(info, function(err, collection) {
+          if (err) {
+            console.log('no ' + name + ' collection available, mongodb offline?');
+            console.log(err);
+            process.exit(1);
+          }
+          module.exports[name] = collection;
+          next();
+        });
+      }, callback);
+    }
+    else
+    {
+      callback(null);
+    }
   });
 }
 
@@ -152,7 +178,9 @@ function appBootstrap(callback) {
     }
   });
 
-  app.use(canonicalizeHost);
+  if (options.host) {
+    app.use(canonicalizeHost);
+  }
 
   if (options.static)
   {
@@ -233,13 +261,18 @@ function appBootstrap(callback) {
 }
 
 module.exports.listen = function() {
-  var port = options.port ? options.port : 3000;
-  try {
-    // In production get the port number from stagecoach
-    port = fs.readFileSync(__dirname + '/data/port', 'UTF-8').replace(/\s+$/, '');
-  } catch (err) {
-    // This is handy in a dev environment
-    console.log("I see no data/port file, defaulting to port " + port);
+  // Default port for dev
+  var port = 3000;
+  // Heroku
+  if (process.env.PORT) {
+    port = process.env.PORT;
+  } else {
+    try {
+      // Stagecoach option
+      port = fs.readFileSync(__dirname + '/data/port', 'UTF-8').replace(/\s+$/, '');
+    } catch (err) {
+      console.log("I see no data/port file, defaulting to port " + port);
+    }
   }
   console.log("Listening on port " + port);
   app.listen(port);

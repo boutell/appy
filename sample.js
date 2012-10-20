@@ -34,22 +34,25 @@ appy.bootstrap({
   // If you're using locked: true you can make exceptions here
   // unlocked: [ '/welcome' ]
   sessionSecret: 'whatever',
-  host: 'my.example.com:3000',
+  // Redirects to this host if accessed by another name
+  // (canonicalization). This is pretty hard to undo once
+  // the browser gets the redirect, so use it in production only
+  // host: 'my.example.com:3000',
   db: {
     // host: 'localhost'
     // port: 27017,
-    name: 'example'
+    name: 'example',
+    collections: [ 'posts' ]
   },
   ready: function(app, db) {
-    var poster = db.collection('post');
     app.get('/', function(req, res) {
-      poster.find().sort({created: -1}).toArray(function(err, posts) {
+      appy.posts.find().sort({created: -1}).toArray(function(err, posts) {
         res.send(posts.map(function(post) { return post.message; }).join());
       });
     });
     app.get('/new/:message', function(req, res) {
       var post = { 'message': req.params.message, 'createdAt': new Date() };
-      poster.insert(post, function(err) {
+      appy.posts.insert(post, function(err) {
         res.send('added');
       });
     });

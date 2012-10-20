@@ -7,11 +7,14 @@ Right now appy creates an app that:
 
 * Uses Twitter for authentication (you must register a Twitter app), or local authentication against a hardcoded set of users for testing
 * Has /login and /logout URLs for the above
-* Has a MongoDB database for storage and for sessions
-* Redirects traffic to a preferred hostname
+* Provides a MongoDB database for storage and for sessions (safe: true is on)
+* Provides ready-to-rock MongoDB collection objects 
+* Redirects traffic to a canonical hostname
 * Offers a simple way to lock any part of the app to require login
 * Has the Express bodyParser, session and cookie middleware in place
-* Listens on port 3000 unless it sees a data/port file (ready for use with Stagecoach)
+* Uses the Jade template engine by default
+* Listens on port 3000 unless it sees a PORT environment variable
+(first option) or a data/port file (ready for use with Heroku or Stagecoach)
 
 You must pass a callback function called `ready` to the appy.boostrap method. This callback receives the Express app and the db for convenience, however you can also access them as properties of the appy object.
 
@@ -61,18 +64,20 @@ Here's a simple example (see also `sample.js`):
       db: {
         // host: 'localhost'
         // port: 27017,
-        name: 'example'
+        name: 'example',
+        // These collections are automatically created and
+        // become properties of the appy object
+        collections: [ 'posts' ]
       },
       ready: function(app, db) {
-        var poster = db.collection('post');
         app.get('/', function(req, res) {
-          poster.find().sort({created: -1}).toArray(function(err, posts) {
-            res.send(posts.map(function(post) { return post.message; }).join());
+          appy.posts.find().sort({created: -1}).toArray(function(err, posts) {
+            res.send(appy.posts.map(function(post) { return post.message; }).join());
           });
         });
         app.get('/new/:message', function(req, res) {
           var post = { 'message': req.params.message, 'createdAt': new Date() };
-          poster.insert(post, function(err) {
+          appy.posts.insert(post, function(err) {
             res.send('added');
           });
         });
