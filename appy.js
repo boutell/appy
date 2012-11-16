@@ -13,20 +13,36 @@ var app;
 var insecure = { login: true, logout: true };
 
 var authStrategies = {
-  twitter: function(options)
+  twitter: function(authOptions)
   {
     var TwitterStrategy = require('passport-twitter').Strategy;
     passport.use(new TwitterStrategy(
-      options,
+      authOptions,
       function(token, tokenSecret, profile, done) {
         // We now have a unique id, username and full name
         // (display name) for the user courtesy of Twitter.
-        var user = {
-          'id': profile.id,
-          'username': profile.username,
-          'displayName': profile.displayName
-        };
-        done(null, user);
+
+        var user = _.clone(profile);
+
+        // For the convenience of mongodb
+        user._id = user.id;
+
+        // Also copy the token and tokenSecret so that
+        // we can send tweets on the user's behalf at 
+        // any time via ntwitter
+        user.token = token;
+        user.tokenSecret = tokenSecret;
+
+        // If you want to capture information about the user
+        // permanently in the database, this is a great callback
+        // to do it with
+        if (options.beforeSignin) {
+          options.beforeSignin(user, function() {
+            done(null, user);
+          });
+        } else {
+          done(null, user);
+        }
       }
     ));
 
@@ -40,8 +56,15 @@ var authStrategies = {
     // access was granted, the user will be logged in.  Otherwise,
     // authentication has failed.
     app.get('/twitter-auth',
-      passport.authenticate('twitter', { successRedirect: '/',
+      passport.authenticate('twitter', { successRedirect: '/twitter-auth-after-login',
                                          failureRedirect: '/' }));
+    app.get('/twitter-auth-after-login', function(req, res) {
+      if (req.session.afterLogin) {
+        return res.redirect(req.session.afterLogin);
+      } else {
+        return res.redirect('/');
+      }
+    });
   },
   local: function(options)
   {
@@ -130,21 +153,49 @@ function dbBootstrap(callback) {
     if (options.db.collections) {
       async.map(options.db.collections, function(info, next) {
         var name;
+        var options;
         if (typeof(info) !== 'string') {
           name = info.name;
+          options = info;
+          delete options.name;
         }
         else
         {
           name = info;
+          options = {};
         }
-        db.collection(info, function(err, collection) {
+        db.collection(name, options, function(err, collection) {
           if (err) {
             console.log('no ' + name + ' collection available, mongodb offline?');
             console.log(err);
             process.exit(1);
           }
-          module.exports[name] = collection;
-          next();
+          if (options.index) {
+            options.indexes = [ options.index ];
+          }
+          if (options.indexes) {
+            async.map(options.indexes, function(index, next) {
+              var fields = index.fields;
+              // The remaining properties are options
+              delete index.fields;
+              collection.ensureIndex(fields, index, next);
+            }, function(err) {
+              if (err) {
+                console.log('Unable to create index');
+                console.log(err);
+                process.exit(1);
+              }
+              afterIndexes();
+            });
+          }
+          else
+          {
+            afterIndexes();
+          }
+          function afterIndexes() {
+            module.exports[name] = collection;
+            next();
+          }
         });
       }, callback);
     }
@@ -199,7 +250,15 @@ function appBootstrap(callback) {
   app.use(passport.initialize());
   // Passport sessions remember that the user is logged in
   app.use(passport.session());
+
+  // Always make the user object available to templates
+  app.use(function(req, res, next) {
+    res.locals.user = req.user ? req.user : null;
+    next();
+  });
+
   app.use(flash());
+  app.set('view engine', 'jade');
 
   // Before we set up any routes we need to set up our security middleware
 
@@ -281,10 +340,8 @@ module.exports.listen = function() {
 
 function securityMiddleware(req, res, next) {
   var i;
-  for (i = 0; (i < options.unlocked.length); i++)
-  {
-    if (prefixMatch(options.unlocked[i], req.url))
-    {
+  for (i = 0; (i < options.unlocked.length); i++) {
+    if (prefixMatch(options.unlocked[i], req.url)) {
       next();
       return;
     }
@@ -294,9 +351,7 @@ function securityMiddleware(req, res, next) {
     req.session.afterLogin = req.url;
     res.redirect(302, '/login');
     return;
-  }
-  else
-  {
+  } else {
     next();
   }
 }
@@ -305,11 +360,9 @@ function securityMiddleware(req, res, next) {
 function prefixMatch(prefix, url)
 {
   var start = url.substr(0, prefix.length);
-  if (prefix === start)
-  {
+  if (prefix === start) {
     var c = url[prefix.length];
-    if (c && ('/' != c) && ('.' != c) && ('?' != c))
-    {
+    if (c && ('/' != c) && ('.' != c) && ('?' != c)) {
       return false;
     }
     return true;

@@ -43,6 +43,10 @@ appy.bootstrap({
     // port: 27017,
     name: 'example',
     collections: [ 'posts' ]
+    // If I need indexes I specify that collection in more detail:
+    // [ { name: 'posts', index: { fields: { { title: 1 } }, unique: true } } ]
+    // Or more than one index:
+    // [ { name: 'posts', indexes: [ { fields: { { title: 1 } } }, ... ] } ]
   },
   ready: function(app, db) {
     app.get('/', function(req, res) {

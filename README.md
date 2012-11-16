@@ -7,14 +7,16 @@ Right now appy creates an app that:
 
 * Uses Twitter for authentication (you must register a Twitter app), or local authentication against a hardcoded set of users for testing
 * Has /login and /logout URLs for the above
+* Provides a post-authentication callback 
 * Provides a MongoDB database for storage and for sessions (safe: true is on)
-* Provides ready-to-rock MongoDB collection objects 
+* Provides ready-to-rock MongoDB collections
+* Eases configuration of MongoDB indexes
 * Redirects traffic to a canonical hostname
 * Offers a simple way to lock any part of the app to require login
 * Has the Express bodyParser, session and cookie middleware in place
 * Uses the Jade template engine by default
 * Listens on port 3000 unless it sees a PORT environment variable
-(first option) or a data/port file (ready for use with Heroku or Stagecoach)
+ or a data/port file (ready for use with Heroku or Stagecoach)
 
 You must pass a callback function called `ready` to the appy.boostrap method. This callback receives the Express app and the db for convenience, however you can also access them as properties of the appy object.
 
@@ -85,6 +87,7 @@ Here's a simple example (see also `sample.js`):
       }
     });
 
-
-
 Because the goal here is to bootstrap simple apps quickly, I broke the rule that every callback should take an `err` argument first. If your database connection and app configuration fail, what are you supposed to do about it? Not a lot, right? So appy just prints the error and exits.
+
+When users log in via Twitter, some developers will want to do more than just serialize the user object into the session. For instance, I often need to capture Twitter tokens so I can tweet on a user's behalf. To achieve this, just add an options.beforeSignin function:
+
