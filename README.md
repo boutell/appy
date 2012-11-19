@@ -5,7 +5,7 @@ Bootstraps a typical Express 3.0 app with even less fuss than usual. Makes a bun
 
 Right now appy creates an app that:
 
-* Uses Twitter for authentication (you must register a Twitter app), or local authentication against a hardcoded set of users for testing
+* Uses Twitter for authentication (you must register a Twitter app), or local authentication against a hardcoded set of users for testing, or a custom auth strategy function
 * Has /login and /logout URLs for the above
 * Provides a post-authentication callback 
 * Provides a MongoDB database for storage and for sessions (safe: true is on)
@@ -87,10 +87,11 @@ Here's a simple example (see also `sample.js`):
       }
     });
 
+Note that the `strategy` option can also be a custom strategy function rather than a string. You can rely on the strategy functions provided in appy.js as examples of how this function should operate.
+
 Because the goal here is to bootstrap simple apps quickly, I broke the rule that every callback should take an `err` argument first. If your database connection and app configuration fail, what are you supposed to do about it? Not a lot, right? So appy just prints the error and exits.
 
 When users log in via Twitter, some developers will want to do more than just serialize the user object into the session. For instance, I often need to capture Twitter tokens so I can tweet on a user's behalf. To achieve this, just add an options.beforeSignin callback function. The first argument is an error if any, the second is the user object. Note that the Twitter strategy makes the Twitter token and tokenSecret available as properties of the user object, which you can save for later.
-
 
 
 
