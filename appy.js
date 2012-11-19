@@ -293,7 +293,19 @@ function appBootstrap(callback) {
 
   if (options.auth)
   {
-    authStrategies[options.auth.strategy](options.auth.options);
+    // One can pass a custom strategy object or the name
+    // of a built-in strategy
+    var strategy;
+    if (typeof(options.auth.strategy) === 'string') {
+      strategy = authStrategies[options.auth.strategy];
+    } else {
+      strategy = options.auth.strategy;
+    }
+    options.auth.options.app = app;
+    // We made this option top level, but 
+    // custom auth strategies need to be able to see it
+    options.auth.options.beforeSignin = options.beforeSignin;
+    strategy(options.auth.options);
   }
 
   app.get('/logout', function(req, res)
