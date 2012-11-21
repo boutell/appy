@@ -6,6 +6,7 @@ var async = require('async');
 var mongo = require('mongodb');
 var connectMongoDb = require('connect-mongodb');
 var flash = require('connect-flash');
+var url = require('url');
 
 var options;
 var db;
@@ -130,13 +131,31 @@ module.exports.bootstrap = function(optionsArg)
 }
 
 function dbBootstrap(callback) {
+  // Open the database connection
+
+  if (options.db.uri) {
+    // Borrowed this logic from mongoose https://github.com/LearnBoost/mongoose/blob/master/lib/connection.js#L143
+    var uri = url.parse(options.db.uri);
+    options.db.host = uri.hostname;
+    if (parseInt(uri.port)) {
+      options.db.port = parseInt(uri.port);
+    } else {
+      uri.port = 27017;
+    }
+    options.db.name = uri.pathname && uri.pathname.replace(/\//g, '');  
+    if (uri.auth) {
+      var auth = uri.auth.split(':');
+      options.db.user = auth[0];
+      options.db.password = auth[1];
+    }
+  }
   if (!options.db.host) {
     options.db.host = 'localhost';
   }
   if (!options.db.port) {
     options.db.port = 27017;
   }
-  // Open the database connection
+
   db = module.exports.db = new mongo.Db(
     options.db.name,
     new mongo.Server(options.db.host, options.db.port, {}),
@@ -150,6 +169,19 @@ function dbBootstrap(callback) {
       callback(err);
       return;
     }
+    if (options.db.user) {
+      db.authenticate(options.db.user, options.db.password, authenticated);
+    } else {
+      authenticated(null);
+    }
+  });
+
+  function authenticated(err) {
+    if (err) {
+      callback(err);
+      return;
+    }
+
     if (options.db.collections) {
       async.map(options.db.collections, function(info, next) {
         var name;
@@ -203,7 +235,7 @@ function dbBootstrap(callback) {
     {
       callback(null);
     }
-  });
+  }
 }
 
 function appBootstrap(callback) {

@@ -64,6 +64,13 @@ Here's a simple example (see also `sample.js`):
       sessionSecret: 'whatever',
       host: 'my.example.com:3000',
       db: {
+        // If the uri option is present, it wins. This is
+        // MongoLab - compatible. 
+        // You can specify username:password@ the host,
+        // and you can add :port after the host. You can
+        // also specify user and password as separate options
+        //
+        // uri: 'mongodb:user:password@someserver.com/somedatabase'
         // host: 'localhost'
         // port: 27017,
         name: 'example',
