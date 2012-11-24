@@ -384,15 +384,19 @@ module.exports.listen = function() {
 
 function securityMiddleware(req, res, next) {
   var i;
+  // The full URL we really care about is in req.originalUrl.
+  // req.url has any prefix used to set up this middleware
+  // already lopped off, which is clever and useful, but
+  // not in this situation
   for (i = 0; (i < options.unlocked.length); i++) {
-    if (prefixMatch(options.unlocked[i], req.url)) {
+    if (prefixMatch(options.unlocked[i], req.originalUrl)) {
       next();
       return;
     }
   }
 
   if (!req.user) {
-    req.session.afterLogin = req.url;
+    req.session.afterLogin = req.originalUrl;
     res.redirect(302, '/login');
     return;
   } else {
