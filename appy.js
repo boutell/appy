@@ -75,6 +75,10 @@ var authStrategies = {
         var user = _.find(options.users, function(user) {
           return ((user.username === username) && (user.password === password));
         });
+        if (user) {
+          // For the convenience of mongodb (it's unique)
+          user._id = username;
+        }
         if (!user) {
           return done(null, false, { message: 'Invalid username or password' });
         }
@@ -85,22 +89,44 @@ var authStrategies = {
       var message = req.flash('error');
       if (!options.template) {
         options.template =
+          '<style>' +
+          '.appy-login' +
+          '{' +
+          '  width: 300px;' +
+          '  border: 2px solid #ccc;' +
+          '  border-radius: 6px;' +
+          '  padding: 10px;' +
+          '  margin: auto;' +
+          '  margin-top: 100px;' +
+          '}' +
+          '.appy-login label' +
+          '{' +
+          '  float: left;' +
+          '  width: 150px;' +
+          '}' +
+          '.appy-login div' +
+          '{' +
+          '  margin-bottom: 20px;' +
+          '}' +
+          '</style>' +
+          '<div class="appy-login">' +
           '<% if (message) { %>' +
           '<h3><%= message %></h3>' +
           '<% } %>' +
           '<form action="/login" method="post">' +
             '<div>' +
-            '<label>Username:</label>' +
+            '<label>Username</label>' +
             '<input type="text" name="username" /><br/>' +
             '</div>' +
             '<div>' +
-            '<label>Password:</label>' +
+            '<label>Password</label>' +
             '<input type="password" name="password"/>' +
             '</div>' +
-            '<div>' +
-            '<input type="submit" value="Submit"/>' +
+            '<div class="appy-submit">' +
+            '<input type="submit" value="Log In"/>' +
             '</div>' +
-          '</form>';
+          '</form>' + 
+          '</div>';
       }
       if (typeof(options.template) !== 'function') {
         options.template = _.template(options.template);
@@ -283,14 +309,57 @@ function appBootstrap(callback) {
   // Passport sessions remember that the user is logged in
   app.use(passport.session());
 
-  // Always make the user object available to templates
+  // Always make the authenticated user object available
+  // to templates
   app.use(function(req, res, next) {
     res.locals.user = req.user ? req.user : null;
     next();
   });
 
+  // Inject 'partial' into the view engine so that we can have real
+  // partials with a separate namespace and the ability to extend
+  // their own parent template, etc. Express doesn't believe in this, 
+  // but we do.
+  //
+  // Use a clever hack to warn the developer it's not going to work
+  // if they have somehow found a template language that is 
+  // truly asynchronous.
+
+  app.locals.partial = function(name, data) {
+    var result = '___***ASYNCHRONOUS';
+    if (!data) {
+      data = {};
+    }
+    if (!data._locals) {
+      data._locals = {};
+    }
+    if (!data._locals.partial) {
+      data._locals.partial = app.locals.partial;
+    }
+    app.render(name, data, function(err, resultArg) {
+      result = resultArg;
+    });
+    if (result === '___***ASYNCHRONOUS') {
+      throw "'partial' cannot be used with an asynchronous template engine";
+    }
+    return result;
+  };
+
+  // Always define 'error' so we can 'if' on it painlessly
+  // in Jade. This is particularly awkward otherwise
+  app.locals.error = null;
+
+  // Always make flash attributes available
   app.use(flash());
-  app.set('view engine', 'jade');
+
+  // viewEngine can be a custom function to set up the view engine
+  // yourself (useful for Nunjucks and other view engines with a
+  // nonstandard setup procedure with Express)
+  if (typeof(options.viewEngine) === 'function') {
+    options.viewEngine(app);
+  } else {
+    app.set('view engine', options.viewEngine ? options.viewEngine : 'jade');
+  }
 
   // Before we set up any routes we need to set up our security middleware
 
