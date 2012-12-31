@@ -7,6 +7,7 @@ var mongo = require('mongodb');
 var connectMongoDb = require('connect-mongodb');
 var flash = require('connect-flash');
 var url = require('url');
+var dirname = require('path').dirname;
 
 var options;
 var db;
@@ -146,6 +147,11 @@ var authStrategies = {
 module.exports.bootstrap = function(optionsArg)
 {
   options = optionsArg;
+  if (!options.rootDir) {
+    // Convert foo/node_modules/appy back to foo,
+    // so we can find things like foo/data/port automatically
+    options.rootDir = dirname(dirname(__dirname));
+  }
 
   async.series([dbBootstrap, appBootstrap], function(err) {
     if (err) {
@@ -441,7 +447,7 @@ module.exports.listen = function() {
   } else {
     try {
       // Stagecoach option
-      port = fs.readFileSync(__dirname + '/data/port', 'UTF-8').replace(/\s+$/, '');
+      port = fs.readFileSync(options.rootDir + '/data/port', 'UTF-8').replace(/\s+$/, '');
     } catch (err) {
       console.log("I see no data/port file, defaulting to port " + port);
     }
