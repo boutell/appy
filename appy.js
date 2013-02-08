@@ -8,6 +8,7 @@ var connectMongoDb = require('connect-mongodb');
 var flash = require('connect-flash');
 var url = require('url');
 var dirname = require('path').dirname;
+var lessMiddleware = require('less-middleware');
 
 var options;
 var db;
@@ -297,8 +298,19 @@ function appBootstrap(callback) {
     app.use(canonicalizeHost);
   }
 
+  // By default we supply LESS middleware
+  if (options.less === undefined) {
+    options.less = true;
+  }
+
   if (options.static)
   {
+    if (options.less) {
+      app.use(lessMiddleware({
+        src: options.static,
+        compress: true
+      }));
+    }
     app.use(express.static(options.static));
   }
 

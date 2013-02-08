@@ -17,6 +17,8 @@ Right now appy creates an app that:
 * Listens on port 3000 unless it sees a PORT environment variable
  or a data/port file (ready for use with Heroku or Stagecoach)
 * Adds support for robust partials to whatever template language you choose
+* Serves static files from a specified folder (use the `static` option)
+* Performs automatic LESS stylesheet compilation with `less-middleware` if a `.css` file is requested and the corresponding `.less` file exists in the static folder
 
 ## Using Appy
 
@@ -52,6 +54,10 @@ Here's a simple example (see also `sample.js`):
       //     callbackURL: 'http://my.example.com:3000/twitter-auth'
       //   }
       // },
+
+      // Serve static files, with LESS stylesheet compilation of .less files to .css
+      // as needed via less-middleware
+      static: __dirname + '/public',
 
       // Lock the /new prefix to require login. You can lock
       // an array of prefixes if you wish.

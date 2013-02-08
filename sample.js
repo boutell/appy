@@ -25,6 +25,8 @@ appy.bootstrap({
   //   }
   // },
 
+  static: __dirname + '/sample-public',
+
   // Lock the /new prefix to require login. You can lock
   // an array of prefixes if you wish.
   // Prefixes must be followed by / or . or
@@ -51,7 +53,7 @@ appy.bootstrap({
   ready: function(app, db) {
     app.get('/', function(req, res) {
       appy.posts.find().sort({created: -1}).toArray(function(err, posts) {
-        res.send(posts.map(function(post) { return post.message; }).join());
+        res.send('messages: ' + posts.map(function(post) { return post.message; }).join());
       });
     });
     app.get('/new/:message', function(req, res) {
