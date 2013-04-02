@@ -410,6 +410,14 @@ function appBootstrap(callback) {
     // No security by default (but logins work and you can check req.user yourself)
   }
 
+  // Add additional global middleware. Needs to happen before we add any routes,
+  // so we do it before the security strategies, which often add routes
+  if (options.middleware) {
+    _.each(options.middleware, function(middleware) {
+      app.use(middleware);
+    });
+  }
+
   if (options.auth)
   {
     // One can pass a custom strategy object or the name
@@ -421,7 +429,7 @@ function appBootstrap(callback) {
       strategy = options.auth.strategy;
     }
     options.auth.options.app = app;
-    // We made this option top level, but 
+    // We made this option top level, but
     // custom auth strategies need to be able to see it
     options.auth.options.beforeSignin = options.beforeSignin;
     strategy(options.auth.options);

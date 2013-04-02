@@ -19,6 +19,7 @@ Right now appy creates an app that:
 * Adds support for robust partials to whatever template language you choose
 * Serves static files from a specified folder (use the `static` option)
 * Performs automatic LESS stylesheet compilation with `less-middleware` if a `.css` file is requested and the corresponding `.less` file exists in the static folder
+* Provies a way to add more custom middleware if you wish, before any routes are added.
 
 ## Using Appy
 
@@ -68,11 +69,11 @@ Here's a simple example (see also `sample.js`):
 
       // If you're using locked: true you can make exceptions here
       // unlocked: [ '/welcome' ]
-      
+
       sessionSecret: 'whatever',
-      
+
       host: 'my.example.com:3000',
-      
+
       db: {
         // If the uri option is present, it wins. This is
         // MongoLab - compatible. 
@@ -88,7 +89,10 @@ Here's a simple example (see also `sample.js`):
         // become properties of the appy object
         collections: [ 'posts' ]
       },
-      
+
+      // Add some extra global middleware before it's too late to do so
+      middleware: [ function(req, res, next) { ... next(); }],
+
       ready: function(app, db) {
         app.get('/', function(req, res) {
           appy.posts.find().sort({created: -1}).toArray(function(err, posts) {
