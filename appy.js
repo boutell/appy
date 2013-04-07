@@ -89,6 +89,12 @@ var authStrategies = {
     ));
     app.get('/login', function(req, res) {
       var message = req.flash('error');
+      if (Array.isArray(message) && message.length) {
+        // Why is it an array? Well, whatever
+        message = message.join(' ');
+      } else {
+        message = null;
+      }
       if (!options.template) {
         options.template =
           '<style>' +
