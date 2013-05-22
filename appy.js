@@ -9,6 +9,7 @@ var flash = require('connect-flash');
 var url = require('url');
 var dirname = require('path').dirname;
 var lessMiddleware = require('less-middleware');
+var passwordHash = require('password-hash');
 
 var options;
 var db;
@@ -71,20 +72,46 @@ var authStrategies = {
   },
   local: function(options)
   {
+    // First check the hardcoded users. Then check mongodb users. You can specify
+    // an alternate collection name. The collection must have a username property
+    // and a password property, which should have been set by the password-hash
+    // npm module. Populating that table with users is up to you, see the
+    // apostrophe-people module for one example
+
     var LocalStrategy = require('passport-local').Strategy;
     passport.use(new LocalStrategy(
       function(username, password, done) {
         var user = _.find(options.users, function(user) {
-          return ((user.username === username) && (user.password === password));
+          return (user.username === username);
         });
         if (user) {
-          // For the convenience of mongodb (it's unique)
-          user._id = username;
+          if (user.password === password) {
+            // For the convenience of mongodb (it's unique)
+            user._id = username;
+            return done(null, user);
+          } else {
+            return done(null, false, { message: 'Invalid username or password' });
+          }
         }
-        if (!user) {
+        var collection = options.collection || 'users';
+        if (!module.exports[collection]) {
           return done(null, false, { message: 'Invalid username or password' });
         }
-        return done(null, user);
+        var users = module.exports[collection];
+        users.findOne({ username: username }, function(err, user) {
+          if (err) {
+            return done(err);
+          }
+          var result = passwordHash.verify(password, user.password);
+          if (result) {
+            // Don't keep this around where it might wind up in a session somehow,
+            // even though it's hashed that is still dangerous
+            delete user.password;
+            return done(null, user);
+          } else {
+            return done(null, false, { message: 'Invalid username or password' });
+          }
+        });
       }
     ));
     app.get('/login', function(req, res) {
@@ -133,7 +160,7 @@ var authStrategies = {
             '<div class="appy-submit">' +
             '<input type="submit" value="Log In"/>' +
             '</div>' +
-          '</form>' + 
+          '</form>' +
           '</div>';
       }
       if (typeof(options.template) !== 'function') {
@@ -167,7 +194,7 @@ module.exports.bootstrap = function(optionsArg)
     }
     options.ready(app, db);
   });
-}
+};
 
 function dbBootstrap(callback) {
   // Open the database connection
@@ -176,12 +203,12 @@ function dbBootstrap(callback) {
     // Borrowed this logic from mongoose https://github.com/LearnBoost/mongoose/blob/master/lib/connection.js#L143
     var uri = url.parse(options.db.uri);
     options.db.host = uri.hostname;
-    if (parseInt(uri.port)) {
-      options.db.port = parseInt(uri.port);
+    if (parseInt(uri.port, 10)) {
+      options.db.port = parseInt(uri.port, 10);
     } else {
       uri.port = 27017;
     }
-    options.db.name = uri.pathname && uri.pathname.replace(/\//g, '');  
+    options.db.name = uri.pathname && uri.pathname.replace(/\//g, '');
     if (uri.auth) {
       var auth = uri.auth.split(':');
       options.db.user = auth[0];
@@ -221,59 +248,64 @@ function dbBootstrap(callback) {
       return;
     }
 
-    if (options.db.collections) {
-      async.map(options.db.collections, function(info, next) {
-        var name;
-        var options;
-        if (typeof(info) !== 'string') {
-          name = info.name;
-          options = info;
-          delete options.name;
+    // Automatically configure a collection for users if the local strategy
+    // is in use
+
+    var collections = options.db.collections || [];
+    if (options.auth && (options.auth.strategy === 'local')) {
+      var authCollection = options.auth.options.collection || 'users';
+      if (!_.contains(collections, authCollection)) {
+        collections.push(authCollection);
+      }
+    }
+
+    async.map(collections, function(info, next) {
+      var name;
+      var options;
+      if (typeof(info) !== 'string') {
+        name = info.name;
+        options = info;
+        delete options.name;
+      }
+      else
+      {
+        name = info;
+        options = {};
+      }
+      db.collection(name, options, function(err, collection) {
+        if (err) {
+          console.log('no ' + name + ' collection available, mongodb offline?');
+          console.log(err);
+          process.exit(1);
+        }
+        if (options.index) {
+          options.indexes = [ options.index ];
+        }
+        if (options.indexes) {
+          async.map(options.indexes, function(index, next) {
+            var fields = index.fields;
+            // The remaining properties are options
+            delete index.fields;
+            collection.ensureIndex(fields, index, next);
+          }, function(err) {
+            if (err) {
+              console.log('Unable to create index');
+              console.log(err);
+              process.exit(1);
+            }
+            afterIndexes();
+          });
         }
         else
         {
-          name = info;
-          options = {};
+          afterIndexes();
         }
-        db.collection(name, options, function(err, collection) {
-          if (err) {
-            console.log('no ' + name + ' collection available, mongodb offline?');
-            console.log(err);
-            process.exit(1);
-          }
-          if (options.index) {
-            options.indexes = [ options.index ];
-          }
-          if (options.indexes) {
-            async.map(options.indexes, function(index, next) {
-              var fields = index.fields;
-              // The remaining properties are options
-              delete index.fields;
-              collection.ensureIndex(fields, index, next);
-            }, function(err) {
-              if (err) {
-                console.log('Unable to create index');
-                console.log(err);
-                process.exit(1);
-              }
-              afterIndexes();
-            });
-          }
-          else
-          {
-            afterIndexes();
-          }
-          function afterIndexes() {
-            module.exports[name] = collection;
-            next();
-          }
-        });
-      }, callback);
-    }
-    else
-    {
-      callback(null);
-    }
+        function afterIndexes() {
+          module.exports[name] = collection;
+          next();
+        }
+      });
+    }, callback);
   }
 }
 
