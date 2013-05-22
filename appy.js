@@ -32,7 +32,7 @@ var authStrategies = {
         user._id = user.id;
 
         // Also copy the token and tokenSecret so that
-        // we can send tweets on the user's behalf at 
+        // we can send tweets on the user's behalf at
         // any time via ntwitter
         user.token = token;
         user.tokenSecret = tokenSecret;
@@ -41,7 +41,10 @@ var authStrategies = {
         // permanently in the database, this is a great callback
         // to do it with
         if (options.beforeSignin) {
-          options.beforeSignin(user, function() {
+          options.beforeSignin(user, function(err) {
+            if (err) {
+              return done(err);
+            }
             done(null, user);
           });
         } else {
@@ -80,7 +83,29 @@ var authStrategies = {
 
     var LocalStrategy = require('passport-local').Strategy;
     passport.use(new LocalStrategy(
-      function(username, password, done) {
+      function(username, password, callback) {
+        function done(err, user, args) {
+          if (err || (!user)) {
+            return callback(err, user, args);
+          }
+          console.log(options);
+          if (options.beforeSignin) {
+            return options.beforeSignin(user, function(err) {
+              if (err) {
+                // A backwards-compatible way to allow beforeSignin to pass
+                // a message to the login dialog rather than triggering as a
+                // straight 500 error
+                if (err.message) {
+                  return callback(null, false, err);
+                } else {
+                  return callback(err);
+                }
+              }
+              return callback(null, user, args);
+            });
+          }
+          return callback(null, user, args);
+        }
         var user = _.find(options.users, function(user) {
           return (user.username === username);
         });

@@ -106,7 +106,11 @@ Note that the `strategy` option can also be a custom strategy function rather th
 
 Because the goal here is to bootstrap simple apps quickly, I broke the rule that every callback should take an `err` argument first. If your database connection and app configuration fail, what are you supposed to do about it? Not a lot, right? So appy just prints the error and exits.
 
+## The beforeSignin callback
+
 When users log in via Twitter, some developers will want to do more than just serialize the user object into the session. For instance, I often need to capture Twitter tokens so I can tweet on a user's behalf. To achieve this, just add an options.beforeSignin callback function. The first argument is an error if any, the second is the user object. Note that the Twitter strategy makes the Twitter token and tokenSecret available as properties of the user object, which you can save for later.
+
+The local strategy, on the other hand, will display a message to the user and give them another chance to log in if `err` is an object with a `message` property.
 
 ## Appy, Template Languages and Partials
 
