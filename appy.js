@@ -88,7 +88,6 @@ var authStrategies = {
           if (err || (!user)) {
             return callback(err, user, args);
           }
-          console.log(options);
           if (options.beforeSignin) {
             return options.beforeSignin(user, function(err) {
               if (err) {
